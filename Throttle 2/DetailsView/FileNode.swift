@@ -1,89 +1,88 @@
 import SwiftUI
 
 struct FileNode: Identifiable {
-    let id: String
-    let name: String
-    let path: String
-    let isDirectory: Bool
-    var children: [FileNode]
-    let fileIndex: Int?
-    let length: Int64?
-    let bytesCompleted: Int64?
-    
-    var progress: Double {
-        if isDirectory {
-            guard !children.isEmpty else { return 0 }
-            let totalProgress = children.reduce(0.0) { $0 + $1.progress }
-            return totalProgress / Double(children.count)
-        } else {
-            guard let length = length, length > 0 else { return 0 }
-            return Double(bytesCompleted ?? 0) / Double(length)
-        }
+  let id: String
+  let name: String
+  let path: String
+  let isDirectory: Bool
+  var children: [FileNode]
+  let fileIndex: Int?
+  let length: Int64?
+  let bytesCompleted: Int64?
+
+  var progress: Double {
+    if isDirectory {
+      guard !children.isEmpty else { return 0 }
+      let totalProgress = children.reduce(0.0) { $0 + $1.progress }
+      return totalProgress / Double(children.count)
+    } else {
+      guard let length = length, length > 0 else { return 0 }
+      return Double(bytesCompleted ?? 0) / Double(length)
     }
+  }
 }
 
 extension Array where Element == (Int, TorrentFile) {
-    func toFileTree() -> [FileNode] {
-        var nodes: [String: FileNode] = [:]
-        // First pass: Create all directory nodes
-        for (index, file) in self {
-            let components = file.name.split(separator: "/")
-            // Create directory nodes
-            for (i, component) in components.dropLast().enumerated() {
-                let dirPath = String(components[...i].joined(separator: "/"))
-                if nodes[dirPath] == nil {
-                    nodes[dirPath] = FileNode(
-                        id: dirPath,
-                        name: String(component),
-                        path: dirPath,
-                        isDirectory: true,
-                        children: [],
-                        fileIndex: nil,
-                        length: nil,
-                        bytesCompleted: nil
-                    )
-                }
-            }
-            // Create file node
-            let filePath = file.name
-            nodes[filePath] = FileNode(
-                id: filePath,
-                name: String(components.last!),
-                path: filePath,
-                isDirectory: false,
-                children: [],
-                fileIndex: index,
-                length: file.length,
-                bytesCompleted: file.bytesCompleted
-            )
+  func toFileTree() -> [FileNode] {
+    var nodes: [String: FileNode] = [:]
+    // First pass: Create all directory nodes
+    for (index, file) in self {
+      let components = file.name.split(separator: "/")
+      // Create directory nodes
+      for (i, component) in components.dropLast().enumerated() {
+        let dirPath = String(components[...i].joined(separator: "/"))
+        if nodes[dirPath] == nil {
+          nodes[dirPath] = FileNode(
+            id: dirPath,
+            name: String(component),
+            path: dirPath,
+            isDirectory: true,
+            children: [],
+            fileIndex: nil,
+            length: nil,
+            bytesCompleted: nil
+          )
         }
-        // Second pass: Build the tree structure
-        for (path, node) in nodes {
-            if node.isDirectory {
-                let dirPath = path + "/"
-                let children = nodes.filter {
-                    $0.key.hasPrefix(dirPath) &&
-                    $0.key.dropFirst(dirPath.count).contains("/") == false
-                }
-                nodes[path]?.children = children.values.sorted { $0.name < $1.name }
-            }
-        }
-        return nodes.values.filter { !$0.path.contains("/") }.sorted { $0.name < $1.name }
+      }
+      // Create file node
+      let filePath = file.name
+      nodes[filePath] = FileNode(
+        id: filePath,
+        name: String(components.last!),
+        path: filePath,
+        isDirectory: false,
+        children: [],
+        fileIndex: index,
+        length: file.length,
+        bytesCompleted: file.bytesCompleted
+      )
     }
+    // Second pass: Build the tree structure
+    for (path, node) in nodes {
+      if node.isDirectory {
+        let dirPath = path + "/"
+        let children = nodes.filter {
+          $0.key.hasPrefix(dirPath) && $0.key.dropFirst(dirPath.count).contains("/") == false
+        }
+        nodes[path]?.children = children.values.sorted { $0.name < $1.name }
+      }
+    }
+    return nodes.values.filter { !$0.path.contains("/") }.sorted { $0.name < $1.name }
+  }
 }
 
 //extension Array where Element == TorrentFile {
 //    func toFileTree() -> [FileNode] {
 //        var nodes: [String: FileNode] = [:]
-//        
+//
 //        // First pass: Create all directory nodes
 //        for (index, file) in self.enumerated() {
 //            let components = file.name.split(separator: "/")
-//            
+//
 //            // Create directory nodes
 //            for (i, component) in components.dropLast().enumerated() {
 //                let dirPath = String(components[...i].joined(separator: "/"))
-//                
+//
 //                if nodes[dirPath] == nil {
 //                    nodes[dirPath] = FileNode(
 //                        id: dirPath,
@@ -97,7 +96,7 @@ extension Array where Element == (Int, TorrentFile) {
 //                    )
 //                }
 //            }
-//            
+//
 //            // Create file node
 //            let filePath = file.name
 //            nodes[filePath] = FileNode(
@@ -111,7 +110,7 @@ extension Array where Element == (Int, TorrentFile) {
 //                bytesCompleted: file.bytesCompleted
 //            )
 //        }
-//        
+//
 //        // Second pass: Build the tree structure
 //        for (path, node) in nodes {
 //            if node.isDirectory {
@@ -123,7 +122,7 @@ extension Array where Element == (Int, TorrentFile) {
 //                nodes[path]?.children = children.values.sorted { $0.name < $1.name }
 //            }
 //        }
-//        
+//
 //        return nodes.values.filter { !$0.path.contains("/") }.sorted { $0.name < $1.name }
 //    }
 //}
@@ -131,7 +130,7 @@ extension Array where Element == (Int, TorrentFile) {
 //struct TorrentFilesView: View {
 //    let torrent: Torrent
 //    let manager: TorrentManager
-//    
+//
 //    private func getAllFileIndices(_ node: FileNode) -> [Int] {
 //        var indices: [Int] = []
 //        if let fileIndex = node.fileIndex {
@@ -142,11 +141,11 @@ extension Array where Element == (Int, TorrentFile) {
 //        }
 //        return indices
 //    }
-//    
+//
 //    var body: some View {
 //        VStack(spacing: 8) {
-//           
-//            
+//
+//
 //            let fileTree = torrent.files.toFileTree()
 //            ForEach(fileTree) { node in
 //                FileNodeView(
@@ -171,7 +170,7 @@ extension Array where Element == (Int, TorrentFile) {
 //                        .font(.caption)
 //                }
 //                .buttonStyle(.bordered)
-//                
+//
 //                Button(action: {
 //                    Task {
 //                        try? await manager.setTorrentFiles(
@@ -198,11 +197,11 @@ extension Array where Element == (Int, TorrentFile) {
 //    let manager: TorrentManager
 //    let torrentId: Int
 //    let getAllFileIndices: (FileNode) -> [Int]
-//    
+//
 //    private var torrent: Torrent? {
 //        manager.torrents.first(where: { $0.id == torrentId })
 //    }
-//    
+//
 //    private var isWanted: Bool {
 //        if node.isDirectory {
 //            // A directory is "wanted" if at least one of its children is wanted
@@ -218,7 +217,7 @@ extension Array where Element == (Int, TorrentFile) {
 //        }
 //        return true
 //    }
-//    
+//
 //    var body: some View {
 //        VStack(alignment: .leading, spacing: 0) {
 //            Button(action: {
@@ -247,12 +246,12 @@ extension Array where Element == (Int, TorrentFile) {
 //                    Group {
 //                        Image(systemName: node.isDirectory ? "folder.fill" : "doc.fill")
 //                            .foregroundColor(node.isDirectory ? .blue : .gray)
-//                        
+//
 //                        Text(node.name)
 //                            .lineLimit(1)
-//                        
+//
 //                        Spacer()
-//                        
+//
 //                        if !node.isDirectory {
 //                            Text("\(Int(node.progress * 100))%")
 //                                .font(.caption)
@@ -264,7 +263,7 @@ extension Array where Element == (Int, TorrentFile) {
 //                .padding(.leading, CGFloat(level * 20))
 //            }
 //            .buttonStyle(.plain)
-//            
+//
 //            if !node.isDirectory {
 //                HStack {
 //                    Spacer()
@@ -273,7 +272,7 @@ extension Array where Element == (Int, TorrentFile) {
 //                        .opacity(isWanted ? 1.0 : 0.4)
 //                }
 //            }
-//            
+//
 //            if node.isDirectory {
 //                ForEach(node.children) { child in
 //                    FileNodeView(

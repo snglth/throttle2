@@ -83,326 +83,335 @@ struct TorrentListView: View {
             return filtered.sorted { ($0.activityDate ?? .distantPast) > ($1.activityDate ?? .distantPast) }
         default:
             return filtered.sorted { ($0.addedDate ?? .distantPast) > ($1.addedDate ?? .distantPast) }
-        }
-    }
-    
-    var body: some View {
-    VStack{
-            ScrollView {
-                LazyVStack {
-#if os(iOS)
-                    if manager.isLoading {
-                        ProgressView()
-                    }
-#endif
-                    
-                    ForEach(sortedTorrents) { torrent in
-                        TorrentRowView(
-                            manager: manager,
-                            store: store,
-                            torrent: torrent,
-                            onDelete: { deleteTorrent(torrent) },
-                            onMove: { moveTorrent(torrent) },
-                            onRename: { renameTorrent(torrent) },
-                            selecting: selecting,
-                            selected: $selected,
-                        )
-                    }
-                }.padding(.bottom, 0)
-            }.padding(.bottom, 0)
-            ServerStatusBar(
-                manager: manager,
-                store: store,
-                showServerSettings: $showServerSettings,
-            ).padding(.top,-10)
-//                .onTapGesture {
-//                    #if os(iOS)
-//                    if !isiPad {
-//                        showServerSettings.toggle()
-//                    }
-//                    #endif
-//                }
-    }
-#if os(macOS)
-    // Enforce minimum practical width for torrent list panel
-    .frame(minWidth: 420)
-#endif
-        
-       
-        .onChange(of: sortOption) {
-            ToastManager.shared.show(message: "Sorted by: \(sortOption)", icon: "arrow.down.app", color: Color.blue)
-            print("Sort option changed to: \(sortOption)")
-        }
-        .onChange(of: filterOption){
-            ToastManager.shared.show(message: "Showing: \(filterOption)", icon: "line.3.horizontal.decrease", color: Color.blue)
-        }
-        .refreshable {
-            Task {
-                // do a full reset on refresh
-                manager.isLoading.toggle()
-                let saveserver = store.selection
-                store.selection = nil
-                try? await Task.sleep(nanoseconds: 1_00_000_000)
-                store.selection = saveserver
-                manager.reset()
-            }
-        }
-        .searchable(text: $searchQuery, prompt: "Search")
-        
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                if !selecting {
-                    Button {
-                        selecting.toggle()
-                        selected = []
-                    } label:{
-                        Image(systemName: "checklist.unchecked")
-                    }
-                } else{
-                    Menu {
-                        Button("Stop Selecting", systemImage: "xmark") {
-                            selecting.toggle()
-                            selected = []
-                        }
-                        if selecting {
-                            Button("Select All", systemImage: "checkmark.circle.fill") {
-                                selected = sortedTorrents.map { $0.id }
-                            }
-                            Button("Select None", systemImage: "checkmark.circle.badge.xmark") {
-                                selected = []
-                            }
-                            if selected != [] {
-                                Button("Start Selected", systemImage: "play") {
-                                    Task {
-                                        do {
-                                            _ = try await manager.startTorrents(ids: selected)
-                                            ToastManager.shared.show(message: "Started \(selected.count) torrents", icon: "play", color: .green)
-                                            selecting.toggle()
-                                        } catch {
-                                            ToastManager.shared.show(message: "Failed to start torrents", icon: "xmark", color: .red)
-                                        }
-                                    }
-                                }
-                                Button("Stop Selected", systemImage: "stop") {
-                                    Task {
-                                        do {
-                                            _ = try await manager.stopTorrents(ids: selected)
-                                            ToastManager.shared.show(message: "Stopped \(selected.count) torrents", icon: "stop", color: .orange)
-                                            selecting.toggle()
-                                        } catch {
-                                            ToastManager.shared.show(message: "Failed to stop torrents", icon: "xmark", color: .red)
-                                        }
-                                    }
-                                }
-                                Button("Verify Selected", systemImage: "externaldrive.badge.questionmark") {
-                                    Task {
-                                        do {
-                                            _ = try await manager.verifyTorrents(ids: selected)
-                                            ToastManager.shared.show(message: "Verified \(selected.count) torrents", icon: "externaldrive.badge.questionmark", color: .blue)
-                                            selecting.toggle()
-                                        } catch {
-                                            ToastManager.shared.show(message: "Failed to verify torrents", icon: "xmark", color: .red)
-                                        }
-                                    }
-                                }
-                                Button("Announce Selected", systemImage: "megaphone") {
-                                    Task {
-                                        do {
-                                            _ = try await manager.reannounceTorrents(ids: selected)
-                                            ToastManager.shared.show(message: "Announced \(selected.count) torrents", icon: "megaphone", color: .purple)
-                                            selecting.toggle()
-                                        } catch {
-                                            ToastManager.shared.show(message: "Failed to announce torrents", icon: "xmark", color: .red)
-                                        }
-                                    }
-                                }
-                                Button("Delete Selected", systemImage: "trash") {
-                                    deleteSelectedTorrents()
-                                }
-                            }
-                        }
-                    } label: {
-                        #if os(macOS)
-                        Image(systemName: "checklist")
-                        #else
-                        ZStack{
-                            Image(systemName: "checklist")
-                                .foregroundColor(.orange)
-                        }
-                        #endif
-                    }
-                }
-            }
-
-            if !isSidebarVisible {
-                ToolbarItem(placement: .automatic){
-                    FilterMenu(isSidebar: false)
-                }
-            }
-        }
-        
-        .onAppear {
-//            if TunnelManagerHolder.shared.getTunnel(withIdentifier: "http-streamer") != nil{
-//                activateThumbnails()
-//            }
-            print("🚀 View appeared, starting periodic updates")
-            manager.startPeriodicUpdates()
-        }
-        .onDisappear {
-            print("👋 View disappeared, stopping updates")
-            manager.stopPeriodicUpdates()
-        }
-       
-        
-        // Delete Alert
-        .alert("Delete Torrent", isPresented: $showDeleteAlert) {
-            Button("Delete Files", role: .destructive) {
-                Task {
-                    await performDelete(deleteFiles: true)
-                }
-            }
-            
-            Button("Remove Torrent Only", role: .destructive) {
-                Task {
-                    await performDelete(deleteFiles: false)
-                }
-            }
-            
-            Button("Cancel", role: .cancel) {}
-            
-        } message: {
-            if let name = selectedTorrent?.name {
-                Text("Are you sure you want to remove \(name)?")
-            } else {
-                Text("Are you sure you want to remove this torrent?")
-            }
-        }
-        
-        // Multiple Delete Alert
-        .alert("Delete Torrents", isPresented: $showMultipleDeleteAlert) {
-            Button("Delete Files", role: .destructive) {
-                Task {
-                    await performMultipleDelete(deleteFiles: true)
-                }
-            }
-            
-            Button("Remove Torrents Only", role: .destructive) {
-                Task {
-                    await performMultipleDelete(deleteFiles: false)
-                }
-            }
-            
-            Button("Cancel", role: .cancel) {}
-            
-        } message: {
-            Text("Are you sure you want to remove \(selected.count) torrents?")
-        }
-        
-        // Rename Sheet
-        .sheet(isPresented: $showRenameAlert) {
-            renameSheet
-        }
-        
-        // Move Sheet
-        .sheet(isPresented: $showMoveAlert) {
-            moveSheet
-        }
-        
-        // File Browser Sheet (used inside the move sheet)
-        .sheet(isPresented: $showFileBrowser) {
-            fileBrowserSheet
-        }
-        
-        // Server Settings
-        .sheet(isPresented: $showServerSettings) {
-            TransmissionSettingsView (manager: manager, store: store )
-        }
-        
-        
-        .sheet(isPresented: $store.FileBrowse, onDismiss: {
-            store.isOpeningVideoDirectly = false
-        }, content: {
-            Group {
-                if let url = store.fileURL, let torrentName = store.fileBrowserName {
-
-                    SFTPFileBrowserView(
-                        currentPath: url + "/" + torrentName,
-                        basePath: url + "/" + torrentName, //(store.selection?.pathServer) ?? "",
-                        server: store.selection,
-                        store: store
-                    ).withToast()
-                    #if os(macOS)
-                    .frame(minWidth: 800, minHeight: 500)
-                    #endif
-                    
-                } else {
-                    // Fallback if path not available
-                    VStack {
-                        ProgressView()
-                        Text("Loading file browser...")
-                    }
-                    #if os(macOS)
-                    .frame(minWidth: 800, minHeight: 500)
-                    #endif
-                }
-            }
-            #if os(iOS)
-            .presentationDetents(store.isOpeningVideoDirectly ? [.height(1)] : [.large])
-            #endif
-        })
-        #if os(iOS)
-        .fullScreenCover(isPresented: $store.FileBrowseCover, onDismiss: {
-            store.isOpeningVideoDirectly = false
-        }, content: {
-            Group {
-                if let url = store.fileURL, let torrentName = store.fileBrowserName {
-
-                    SFTPFileBrowserView(
-                        currentPath: url + "/" + torrentName,
-                        basePath: url + "/" + torrentName, //(store.selection?.pathServer) ?? "",
-                        server: store.selection,
-                        store: store
-                    ).withToast()
-                    
-                } else {
-                    // Fallback if path not available
-                    VStack {
-                        ProgressView()
-                        Text("Loading file browser...")
-                    }
-                }
-            }
-        })
-        #else
-        .sheet(isPresented: $store.FileBrowseCover, onDismiss: {
-            store.isOpeningVideoDirectly = false
-        }, content: {
-            Group {
-                if let url = store.fileURL, let torrentName = store.fileBrowserName {
-
-                    SFTPFileBrowserView(
-                        currentPath: url + "/" + torrentName,
-                        basePath: url + "/" + torrentName, //(store.selection?.pathServer) ?? "",
-                        server: store.selection,
-                        store: store
-                    ).withToast()
-                    .frame(minWidth: 800, minHeight: 800)
-                    
-                } else {
-                    // Fallback if path not available
-                    VStack {
-                        ProgressView()
-                        Text("Loading file browser...")
-                    }
-                    .frame(minWidth: 800, minHeight: 800)
-                }
-            }
-        })
-        #endif
-        
-    }
-    
-    // MARK: Delete Torrent
+	        }
+	    }
+	    
+	    var body: some View {
+	        torrentListDialogs
+	    }
+	    
+	    private var torrentListBase: some View {
+	        VStack {
+	            ScrollView {
+	                LazyVStack {
+	#if os(iOS)
+	                    if manager.isLoading {
+	                        ProgressView()
+	                    }
+	#endif
+	                    
+	                    ForEach(sortedTorrents) { torrent in
+	                        torrentRow(for: torrent)
+	                    }
+	                }.padding(.bottom, 0)
+	            }.padding(.bottom, 0)
+	            ServerStatusBar(
+	                manager: manager,
+	                store: store,
+	                showServerSettings: $showServerSettings,
+	            ).padding(.top,-10)
+	//                .onTapGesture {
+	//                    #if os(iOS)
+	//                    if !isiPad {
+	//                        showServerSettings.toggle()
+	//                    }
+	//                    #endif
+	//                }
+	        }
+	    }
+	    
+	    private func torrentRow(for torrent: Torrent) -> some View {
+	        TorrentRowView(
+	            manager: manager,
+	            store: store,
+	            torrent: torrent,
+	            onDelete: { deleteTorrent(torrent) },
+	            onMove: { moveTorrent(torrent) },
+	            onRename: { renameTorrent(torrent) },
+	            selecting: selecting,
+	            selected: $selected,
+	            torrentProgress: torrent.progress
+	        )
+	    }
+	    
+	    @ToolbarContentBuilder
+	    private var torrentListToolbar: some ToolbarContent {
+	        ToolbarItem(placement: .automatic) {
+	            if !selecting {
+	                Button {
+	                    selecting.toggle()
+	                    selected = []
+	                } label: {
+	                    Image(systemName: "checklist.unchecked")
+	                }
+	            } else {
+	                Menu {
+	                    Button("Stop Selecting", systemImage: "xmark") {
+	                        selecting.toggle()
+	                        selected = []
+	                    }
+	                    if selecting {
+	                        Button("Select All", systemImage: "checkmark.circle.fill") {
+	                            selected = sortedTorrents.map { $0.id }
+	                        }
+	                        Button("Select None", systemImage: "checkmark.circle.badge.xmark") {
+	                            selected = []
+	                        }
+	                        if selected != [] {
+	                            Button("Start Selected", systemImage: "play") {
+	                                Task {
+	                                    do {
+	                                        _ = try await manager.startTorrents(ids: selected)
+	                                        ToastManager.shared.show(message: "Started \(selected.count) torrents", icon: "play", color: .green)
+	                                        selecting.toggle()
+	                                    } catch {
+	                                        ToastManager.shared.show(message: "Failed to start torrents", icon: "xmark", color: .red)
+	                                    }
+	                                }
+	                            }
+	                            Button("Stop Selected", systemImage: "stop") {
+	                                Task {
+	                                    do {
+	                                        _ = try await manager.stopTorrents(ids: selected)
+	                                        ToastManager.shared.show(message: "Stopped \(selected.count) torrents", icon: "stop", color: .orange)
+	                                        selecting.toggle()
+	                                    } catch {
+	                                        ToastManager.shared.show(message: "Failed to stop torrents", icon: "xmark", color: .red)
+	                                    }
+	                                }
+	                            }
+	                            Button("Verify Selected", systemImage: "externaldrive.badge.questionmark") {
+	                                Task {
+	                                    do {
+	                                        _ = try await manager.verifyTorrents(ids: selected)
+	                                        ToastManager.shared.show(message: "Verified \(selected.count) torrents", icon: "externaldrive.badge.questionmark", color: .blue)
+	                                        selecting.toggle()
+	                                    } catch {
+	                                        ToastManager.shared.show(message: "Failed to verify torrents", icon: "xmark", color: .red)
+	                                    }
+	                                }
+	                            }
+	                            Button("Announce Selected", systemImage: "megaphone") {
+	                                Task {
+	                                    do {
+	                                        _ = try await manager.reannounceTorrents(ids: selected)
+	                                        ToastManager.shared.show(message: "Announced \(selected.count) torrents", icon: "megaphone", color: .purple)
+	                                        selecting.toggle()
+	                                    } catch {
+	                                        ToastManager.shared.show(message: "Failed to announce torrents", icon: "xmark", color: .red)
+	                                    }
+	                                }
+	                            }
+	                            Button("Delete Selected", systemImage: "trash") {
+	                                deleteSelectedTorrents()
+	                            }
+	                        }
+	                    }
+	                } label: {
+	                    #if os(macOS)
+	                    Image(systemName: "checklist")
+	                    #else
+	                    ZStack {
+	                        Image(systemName: "checklist")
+	                            .foregroundColor(.orange)
+	                    }
+	                    #endif
+	                }
+	            }
+	        }
+	        
+	        if !isSidebarVisible {
+	            ToolbarItem(placement: .automatic) {
+	                FilterMenu(isSidebar: false)
+	            }
+	        }
+	    }
+	    
+	    private var torrentListMain: some View {
+	        torrentListBase
+	#if os(macOS)
+	            // Enforce minimum practical width for torrent list panel
+	            .frame(minWidth: 420)
+	#endif
+	            .onChange(of: sortOption) {
+	                ToastManager.shared.show(message: "Sorted by: \(sortOption)", icon: "arrow.down.app", color: Color.blue)
+	                print("Sort option changed to: \(sortOption)")
+	            }
+	            .onChange(of: filterOption) {
+	                ToastManager.shared.show(message: "Showing: \(filterOption)", icon: "line.3.horizontal.decrease", color: Color.blue)
+	            }
+	            .refreshable {
+	                Task {
+	                    // do a full reset on refresh
+	                    manager.isLoading.toggle()
+	                    let saveserver = store.selection
+	                    store.selection = nil
+	                    try? await Task.sleep(nanoseconds: 1_00_000_000)
+	                    store.selection = saveserver
+	                    manager.reset()
+	                }
+	            }
+	            .searchable(text: $searchQuery, prompt: "Search")
+	            .toolbar {
+	                torrentListToolbar
+	            }
+	            .onAppear {
+	//            if TunnelManagerHolder.shared.getTunnel(withIdentifier: "http-streamer") != nil{
+	//                activateThumbnails()
+	//            }
+	                print("🚀 View appeared, starting periodic updates")
+	                manager.startPeriodicUpdates()
+	            }
+	            .onDisappear {
+	                print("👋 View disappeared, stopping updates")
+	                manager.stopPeriodicUpdates()
+	            }
+	    }
+	    
+	    @ViewBuilder
+	    private var sftpFileBrowseSheetContent: some View {
+	        Group {
+	            if let url = store.fileURL, let torrentName = store.fileBrowserName {
+	                SFTPFileBrowserView(
+	                    currentPath: url + "/" + torrentName,
+	                    basePath: url + "/" + torrentName, //(store.selection?.pathServer) ?? "",
+	                    server: store.selection,
+	                    store: store
+	                )
+	                .withToast()
+	                #if os(macOS)
+	                .frame(minWidth: 800, minHeight: 500)
+	                #endif
+	            } else {
+	                // Fallback if path not available
+	                VStack {
+	                    ProgressView()
+	                    Text("Loading file browser...")
+	                }
+	                #if os(macOS)
+	                .frame(minWidth: 800, minHeight: 500)
+	                #endif
+	            }
+	        }
+	        #if os(iOS)
+	        .presentationDetents(store.isOpeningVideoDirectly ? [.height(1)] : [.large])
+	        #endif
+	    }
+	    
+	    @ViewBuilder
+	    private var sftpFileBrowseCoverContent: some View {
+	        Group {
+	            if let url = store.fileURL, let torrentName = store.fileBrowserName {
+	                SFTPFileBrowserView(
+	                    currentPath: url + "/" + torrentName,
+	                    basePath: url + "/" + torrentName, //(store.selection?.pathServer) ?? "",
+	                    server: store.selection,
+	                    store: store
+	                )
+	                .withToast()
+	                #if os(macOS)
+	                .frame(minWidth: 800, minHeight: 800)
+	                #endif
+	            } else {
+	                // Fallback if path not available
+	                VStack {
+	                    ProgressView()
+	                    Text("Loading file browser...")
+	                }
+	                #if os(macOS)
+	                .frame(minWidth: 800, minHeight: 800)
+	                #endif
+	            }
+	        }
+	    }
+	    
+	    private var torrentListDialogs: some View {
+	        torrentListMain
+	            // Delete Alert
+	            .alert("Delete Torrent", isPresented: $showDeleteAlert) {
+	                Button("Delete Files", role: .destructive) {
+	                    Task {
+	                        await performDelete(deleteFiles: true)
+	                    }
+	                }
+	                
+	                Button("Remove Torrent Only", role: .destructive) {
+	                    Task {
+	                        await performDelete(deleteFiles: false)
+	                    }
+	                }
+	                
+	                Button("Cancel", role: .cancel) {}
+	                
+	            } message: {
+	                if let name = selectedTorrent?.name {
+	                    Text("Are you sure you want to remove \(name)?")
+	                } else {
+	                    Text("Are you sure you want to remove this torrent?")
+	                }
+	            }
+	            
+	            // Multiple Delete Alert
+	            .alert("Delete Torrents", isPresented: $showMultipleDeleteAlert) {
+	                Button("Delete Files", role: .destructive) {
+	                    Task {
+	                        await performMultipleDelete(deleteFiles: true)
+	                    }
+	                }
+	                
+	                Button("Remove Torrents Only", role: .destructive) {
+	                    Task {
+	                        await performMultipleDelete(deleteFiles: false)
+	                    }
+	                }
+	                
+	                Button("Cancel", role: .cancel) {}
+	                
+	            } message: {
+	                Text("Are you sure you want to remove \(selected.count) torrents?")
+	            }
+	            
+	            // Rename Sheet
+	            .sheet(isPresented: $showRenameAlert) {
+	                renameSheet
+	            }
+	            
+	            // Move Sheet
+	            .sheet(isPresented: $showMoveAlert) {
+	                moveSheet
+	            }
+	            
+	            // File Browser Sheet (used inside the move sheet)
+	            .sheet(isPresented: $showFileBrowser) {
+	                fileBrowserSheet
+	            }
+	            
+	            // Server Settings
+	            .sheet(isPresented: $showServerSettings) {
+	                TransmissionSettingsView (manager: manager, store: store )
+	            }
+	            
+	            .sheet(isPresented: $store.FileBrowse, onDismiss: {
+	                store.isOpeningVideoDirectly = false
+	            }, content: {
+	                sftpFileBrowseSheetContent
+	            })
+	            #if os(iOS)
+	            .fullScreenCover(isPresented: $store.FileBrowseCover, onDismiss: {
+	                store.isOpeningVideoDirectly = false
+	            }, content: {
+	                sftpFileBrowseCoverContent
+	            })
+	            #else
+	            .sheet(isPresented: $store.FileBrowseCover, onDismiss: {
+	                store.isOpeningVideoDirectly = false
+	            }, content: {
+	                sftpFileBrowseCoverContent
+	            })
+	            #endif
+	    }
+	    
+	    // MARK: Delete Torrent
     
     func deleteTorrent(_ torrent: Torrent) {
         selectedTorrent = torrent

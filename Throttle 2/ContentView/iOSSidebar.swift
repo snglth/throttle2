@@ -7,28 +7,28 @@
 import SwiftUI
 
 struct iOSSidebarSettings: View {
-    //@ObservedObject var filters: TorrentFilters
-    @ObservedObject var store: Store
-    @ObservedObject var presenting: Presenting
-    
-    var body: some View {
-        
-        Section("Create"){
-            Button {
-                presenting.isCreating = true
-            } label: {
-                Label("Create Torrent", systemImage: "document.badge.plus")
-            }
-        }
-    
-            Section("Settings"){
-                Button("Manage Servers", systemImage: "externaldrive"){
-                    presenting.activeSheet = "servers"
-                }.buttonStyle(.plain)
-                Button("App Settings", systemImage: "gearshape"){
-                    presenting.activeSheet = "settings"
-                }.buttonStyle(.plain)
-            }
-     
+  //@ObservedObject var filters: TorrentFilters
+  @ObservedObject var store: Store
+  @ObservedObject var presenting: Presenting
+
+  var body: some View {
+
+    Section("Create") {
+      Button {
+        presenting.isCreating = true
+      } label: {
+        Label("Create Torrent", systemImage: "document.badge.plus")
+      }
     }
+
+    Section("Settings") {
+      Button("Manage Servers", systemImage: "externaldrive") {
+        presenting.activeSheet = "servers"
+      }.buttonStyle(.plain)
+      Button("App Settings", systemImage: "gearshape") {
+        presenting.activeSheet = "settings"
+      }.buttonStyle(.plain)
+    }
+
+  }
 }

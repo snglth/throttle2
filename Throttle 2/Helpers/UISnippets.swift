@@ -9,40 +9,42 @@
 import SwiftUI
 
 struct MacCloseButton: View {
-    @State private var isHovering = false
-    @State private var isPressed = false
-    
-    var action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Circle()
-                .fill(isPressed ? Color.red.opacity(0.5) :
-                      isHovering ? Color.red :
-                      Color(red: 1, green: 0.25, blue: 0.2))
-                .overlay(
-                    Group {
-                        if isHovering {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(.black.opacity(0.5))
-                        }
-                    }
-                )
-                .frame(width: 12, height: 12)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isHovering = hovering
-            }
-        }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
+  @State private var isHovering = false
+  @State private var isPressed = false
+
+  var action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Circle()
+        .fill(
+          isPressed
+            ? Color.red.opacity(0.5)
+            : isHovering ? Color.red : Color(red: 1, green: 0.25, blue: 0.2)
         )
+        .overlay(
+          Group {
+            if isHovering {
+              Image(systemName: "xmark")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(.black.opacity(0.5))
+            }
+          }
+        )
+        .frame(width: 12, height: 12)
     }
+    .buttonStyle(PlainButtonStyle())
+    .onHover { hovering in
+      withAnimation(.easeInOut(duration: 0.1)) {
+        isHovering = hovering
+      }
+    }
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 0)
+        .onChanged { _ in isPressed = true }
+        .onEnded { _ in isPressed = false }
+    )
+  }
 }
 
 //// Example usage in a window
@@ -59,7 +61,7 @@ struct MacCloseButton: View {
 //            .padding(.horizontal, 8)
 //            .padding(.vertical, 6)
 //            .background(Color(white: 0.95))
-//            
+//
 //            // Window content goes here
 //            Text("Window Content")
 //                .frame(maxWidth: .infinity, maxHeight: .infinity)

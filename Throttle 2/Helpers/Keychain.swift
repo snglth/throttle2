@@ -32,27 +32,25 @@
 ////usage:
 //// @KeychainStorage("password") var password
 
-
-
-import SwiftUI
 import KeychainAccess
+import SwiftUI
 
 @propertyWrapper
 struct KeychainStorage: DynamicProperty {
-    let keychainManager: Keychain
-    let key: String
-    var wrappedValue: String {
-        didSet {
-            keychainManager[key] = wrappedValue
-        }
+  let keychainManager: Keychain
+  let key: String
+  var wrappedValue: String {
+    didSet {
+      keychainManager[key] = wrappedValue
     }
-    
-    init(wrappedValue: String = "", _ key: String) {
-        self.key = key
-        // Initialize the Keychain with the shared access group.
-        keychainManager = Keychain(service: "srgim.throttle2")
-            .synchronizable(true)
-        let initialValue = keychainManager[key] ?? wrappedValue
-        self.wrappedValue = initialValue
-    }
+  }
+
+  init(wrappedValue: String = "", _ key: String) {
+    self.key = key
+    // Initialize the Keychain with the shared access group.
+    keychainManager = Keychain(service: "srgim.throttle2")
+      .synchronizable(true)
+    let initialValue = keychainManager[key] ?? wrappedValue
+    self.wrappedValue = initialValue
+  }
 }

@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		752C71E982B1CD29F8F8DE8A /* Pods_Throttle_2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E706AFEF2D9993D6005825F4 /* Pods_Throttle_2.framework */; platformFilter = ios; };
 		E70D0AD52D9E84DD00C9CB48 /* Citadel in Frameworks */ = {isa = PBXBuildFile; productRef = E70D0AD42D9E84DD00C9CB48 /* Citadel */; };
 		E7150E532D631F8B009C4217 /* KeychainAccess in Frameworks */ = {isa = PBXBuildFile; productRef = E7150E522D631F8B009C4217 /* KeychainAccess */; };
 		E76AA8B62D8423E00009CA6F /* SimpleToast in Frameworks */ = {isa = PBXBuildFile; productRef = E76AA8B52D8423E00009CA6F /* SimpleToast */; };
@@ -57,10 +56,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		17C17A00A8B09928D8A5B2E3 /* Pods-Throttle 2.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Throttle 2.release.xcconfig"; path = "Target Support Files/Pods-Throttle 2/Pods-Throttle 2.release.xcconfig"; sourceTree = "<group>"; };
-		2DA01AB29F5FBAAE606649AE /* Pods_Throttle_2.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Throttle_2.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		4089B1EAD08868009A787F14 /* Pods-Throttle 2.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Throttle 2.debug.xcconfig"; path = "Target Support Files/Pods-Throttle 2/Pods-Throttle 2.debug.xcconfig"; sourceTree = "<group>"; };
-		E706AFEF2D9993D6005825F4 /* Pods_Throttle_2.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Pods_Throttle_2.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		E7150E172D631D08009C4217 /* Throttle 2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Throttle 2.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E7150E2E2D631D0A009C4217 /* Throttle 2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Throttle 2Tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E7150E382D631D0A009C4217 /* Throttle 2UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Throttle 2UITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -144,7 +139,6 @@
 				E7150E532D631F8B009C4217 /* KeychainAccess in Frameworks */,
 				E76AA8B62D8423E00009CA6F /* SimpleToast in Frameworks */,
 				E77791BD2DF16BAD0004A54D /* MobileVLCKit.xcframework in Frameworks */,
-				752C71E982B1CD29F8F8DE8A /* Pods_Throttle_2.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -165,15 +159,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		99841CBE5E3296343172B3CA /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				4089B1EAD08868009A787F14 /* Pods-Throttle 2.debug.xcconfig */,
-				17C17A00A8B09928D8A5B2E3 /* Pods-Throttle 2.release.xcconfig */,
-			);
-			path = Pods;
-			sourceTree = "<group>";
-		};
 		E7150E0E2D631D08009C4217 = {
 			isa = PBXGroup;
 			children = (
@@ -182,7 +167,6 @@
 				E7BEDF602D6EF03300E72E6F /* Frameworks */,
 				E7150E182D631D08009C4217 /* Products */,
 				E7F968E72D89307700A19857 /* README.md */,
-				99841CBE5E3296343172B3CA /* Pods */,
 			);
 			sourceTree = "<group>";
 		};
@@ -199,10 +183,8 @@
 		E7BEDF602D6EF03300E72E6F /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				E706AFEF2D9993D6005825F4 /* Pods_Throttle_2.framework */,
 				E71532C02D77E0BD000BB18F /* MobileVLCKit.xcframework */,
 				E7BEDF612D6EF03300E72E6F /* UniformTypeIdentifiers.framework */,
-				2DA01AB29F5FBAAE606649AE /* Pods_Throttle_2.framework */,
 				E7F96D8C2D8F611800A19857 /* QuickLookThumbnailing.framework */,
 				E7F96D8E2D8F611800A19857 /* Quartz.framework */,
 			);
@@ -216,11 +198,9 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = E7150E412D631D0A009C4217 /* Build configuration list for PBXNativeTarget "Throttle 2" */;
 			buildPhases = (
-				72DB4D18C20425C268DA293D /* [CP] Check Pods Manifest.lock */,
 				E7150E132D631D08009C4217 /* Sources */,
 				E7150E142D631D08009C4217 /* Frameworks */,
 				E7150E152D631D08009C4217 /* Resources */,
-				742215A652E9693CCC6C8667 /* [CP] Embed Pods Frameworks */,
 				E7F96D9C2D8F611800A19857 /* Embed Foundation Extensions */,
 				E73ED5362DD184A000933671 /* Copy Files */,
 			);
@@ -354,52 +334,6 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXShellScriptBuildPhase section */
-		72DB4D18C20425C268DA293D /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 12;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-Throttle 2-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		742215A652E9693CCC6C8667 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 12;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Throttle 2/Pods-Throttle 2-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			inputPaths = (
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Throttle 2/Pods-Throttle 2-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "if [[ \"$PLATFORM_NAME\" == \"iphoneos\" || \"$PLATFORM_NAME\" == \"iphonesimulator\" ]]; then\n  \"${PODS_ROOT}/Target Support Files/Pods-Throttle 2/Pods-Throttle 2-frameworks.sh\"\nfi\n";
-			showEnvVarsInLog = 0;
-		};
-/* End PBXShellScriptBuildPhase section */
-
 /* Begin PBXSourcesBuildPhase section */
 		E7150E132D631D08009C4217 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -440,7 +374,6 @@
 /* Begin XCBuildConfiguration section */
 		E7150E422D631D0A009C4217 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 4089B1EAD08868009A787F14 /* Pods-Throttle 2.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=iphoneos*]" = AppIcon;
@@ -448,10 +381,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = "Throttle 2/Throttle_2.entitlements";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = LJM5HAT88S;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -543,6 +478,7 @@
 				);
 				OTHER_MODULE_VERIFIER_FLAGS = "$(inherited) \"[sdk=iphoneos*]\\\"-Fbuild/Debug/MobileVLCKit\\\" [sdk=iphonesimulator*]\\\"-Fbuild/Debug/MobileVLCKit\\\"\"";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.srgim.Throttle-2";
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.ishestakov.Throttle2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -559,7 +495,6 @@
 		};
 		E7150E432D631D0A009C4217 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 17C17A00A8B09928D8A5B2E3 /* Pods-Throttle 2.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=iphoneos*]" = AppIcon;
@@ -567,10 +502,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = "Throttle 2/Throttle 2Release.entitlements";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = LJM5HAT88S;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -662,6 +599,7 @@
 				);
 				OTHER_MODULE_VERIFIER_FLAGS = "$(inherited) \"[sdk=iphoneos*]\\\"-Fbuild/Debug/MobileVLCKit\\\" [sdk=iphonesimulator*]\\\"-Fbuild/Debug/MobileVLCKit\\\"\"";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.srgim.Throttle-2";
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.ishestakov.Throttle2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
