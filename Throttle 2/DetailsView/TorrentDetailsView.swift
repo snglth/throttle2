@@ -349,6 +349,17 @@ struct DetailsView: View {
             }
           }
 
+          // Labels
+          DetailSection(title: "Labels") {
+            let labels = torrent.labels
+            if labels.isEmpty {
+              Text("None")
+                .foregroundStyle(.secondary)
+            } else {
+              TorrentLabelsPillsView(labels: labels)
+            }
+          }
+
           // Transfer Info
           DetailSection(title: "Transfer") {
             VStack(spacing: 12) {

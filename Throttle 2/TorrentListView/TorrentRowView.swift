@@ -126,6 +126,8 @@ struct TorrentRowView: View {
       VStack(alignment: .leading, spacing: 8) {
         Text(torrent.name?.truncatedMiddle() ?? "Loading...")
 
+        TorrentLabelsPillsView(labels: torrent.nonStarredLabels)
+
         HStack {
 
           switch torrent.status {

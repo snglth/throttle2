@@ -7,6 +7,61 @@
 
 import SwiftUI
 
+extension Torrent {
+  var labels: [String] {
+    dynamicFields["labels"]?.value as? [String] ?? []
+  }
+
+  var nonStarredLabels: [String] {
+    labels.filter { $0 != "starred" }
+  }
+}
+
+struct TorrentLabelsPillsView: View {
+  let labels: [String]
+
+  private var normalizedLabels: [String] {
+    var seen: Set<String> = []
+    return labels
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+      .filter { seen.insert($0).inserted }
+  }
+
+  var body: some View {
+    let labels = normalizedLabels
+    if !labels.isEmpty {
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 6) {
+          ForEach(labels, id: \.self) { label in
+            Text(label)
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+              .padding(.horizontal, 8)
+              .padding(.vertical, 2)
+              .background(Color.secondary.opacity(0.12))
+              .clipShape(Capsule())
+          }
+        }
+      }
+      .scrollClipDisabledIfAvailable()
+      .accessibilityLabel("Labels")
+    }
+  }
+}
+
+private extension View {
+  @ViewBuilder
+  func scrollClipDisabledIfAvailable() -> some View {
+    if #available(iOS 17.0, macOS 14.0, *) {
+      self.scrollClipDisabled()
+    } else {
+      self
+    }
+  }
+}
+
 extension TorrentManager {
   struct LabelRequest: Codable {
     var method = "torrent-set"
