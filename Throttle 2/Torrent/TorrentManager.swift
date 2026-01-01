@@ -1,480 +1,173 @@
 //
-//  TorrentRequest.swift
+//  TorrentManager.swift
 //  Throttle 2
 //
 //  Created by Stephen Grigg on 20/2/2025.
 //
 import SwiftUI
+import TransmissionRPC
 
-// MARK: - Models
-struct TorrentRequest: Codable {
-  var method = "torrent-get"
-  let arguments: Arguments
-
-  struct Arguments: Codable {
-    let fields: [String]
-    let ids: [Int]?
-  }
-
-  init(fields: [String], ids: [Int]? = nil) {
-    self.arguments = Arguments(fields: fields, ids: ids)
-  }
-}
-
-struct TorrentResponse: Codable {
-  let arguments: Arguments
-  let result: String
-
-  struct Arguments: Codable {
-    let torrents: [Torrent]
-    let removed: [Int]?
-  }
-}
-
-struct TorrentFile: Codable, Identifiable {
-  let name: String
-  let length: Int64
-  let bytesCompleted: Int64
-
-  // Computed properties
-  var id: String { name }  // Using name as identifier since files have unique paths
-  var progress: Double {
-    length > 0 ? Double(bytesCompleted) / Double(length) : 0
-  }
-
-  // For debug purposes
-  func debugPrint() {
-    print("File: \(name)")
-    print("- Length: \(length)")
-    print("- Completed: \(bytesCompleted)")
-    print("- Progress: \(Int(progress * 100))%")
-  }
-}
-
+// MARK: - Torrent Extensions for Compatibility
 extension Torrent {
-  var addedDate: Date? {
-    if let timestamp = dynamicFields["addedDate"]?.value as? Int {
-      return Date(timeIntervalSince1970: TimeInterval(timestamp))
-    }
-    return nil
-  }
+  // Note: addedDate and activityDate are now provided by the package
+  // These extensions are kept for backward compatibility if needed
 
-  var activityDate: Date? {
-    if let timestamp = dynamicFields["activityDate"]?.value as? Int {
-      return Date(timeIntervalSince1970: TimeInterval(timestamp))
-    }
-    return nil
-  }
-}
-
-struct Torrent: Codable, Identifiable, Observable {
-  var dynamicFields: [String: AnyCodable]
-  var hashString: String? { dynamicFields["hashString"]?.value as? String }
-
-  var id: Int {
-    dynamicFields["id"]?.value as? Int ?? 0
-  }
   var trackerStats: [[String: Any]]? {
-    guard let anyCodable = dynamicFields["trackerStats"],
-      let array = anyCodable.value as? [[String: Any]]
-    else {
-      //print("⚠️ trackerStats not found or incorrect format")
-
-      return nil
-    }
-    return array
-  }
-
-  struct DynamicCodingKeys: CodingKey {
-    var stringValue: String
-    var intValue: Int?
-
-    init?(stringValue: String) {
-      self.stringValue = stringValue
-    }
-
-    init?(intValue: Int) {
-      return nil
-    }
-
-  }
-
-  init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: DynamicCodingKeys.self)
-    var fields: [String: AnyCodable] = [:]
-
-    for key in container.allKeys {
-      fields[key.stringValue] = try container.decode(AnyCodable.self, forKey: key)
-    }
-
-    self.dynamicFields = fields
-  }
-
-  var name: String? { dynamicFields["name"]?.value as? String }
-
-  // Progress related fields
-  var percentDone: Double? {
-    if let value = dynamicFields["percentDone"]?.value {
-      return (value as? Double) ?? (value as? Int).map(Double.init)
-    }
-    return nil
-  }
-
-  var percentComplete: Double? {
-    if let value = dynamicFields["percentComplete"]?.value {
-      return (value as? Double) ?? (value as? Int).map(Double.init)
-    }
-    return nil
-  }
-
-  // Size related fields
-  var downloadedEver: Int64? {
-    if let value = dynamicFields["downloadedEver"]?.value {
-      return (value as? Int64) ?? (value as? Int).map(Int64.init)
-    }
-    return nil
-  }
-
-  var uploadedEver: Int64? {
-    if let value = dynamicFields["uploadedEver"]?.value {
-      return (value as? Int64) ?? (value as? Int).map(Int64.init)
-    }
-    return nil
-  }
-
-  var totalSize: Int64? {
-    if let value = dynamicFields["totalSize"]?.value {
-      return (value as? Int64) ?? (value as? Int).map(Int64.init)
-    }
-    return nil
-  }
-
-  // Status and error fields
-  var status: Int? { dynamicFields["status"]?.value as? Int }
-  var error: Int? { dynamicFields["error"]?.value as? Int }
-  var errorString: String? { dynamicFields["errorString"]?.value as? String }
-
-  // Directory and file management
-  var downloadDir: String? { dynamicFields["downloadDir"]?.value as? String }
-  var wanted: [Bool]? { dynamicFields["wanted"]?.value as? [Bool] }
-
-  // Tracker related fields
-  var trackers: [[String: Any]]? { dynamicFields["trackers"]?.value as? [[String: Any]] }
-  //var trackerStats: [[String: Any]]? { dynamicFields["trackerStats"]?.value as? [[String: Any]] }
-
-  // Files
-  var files: [TorrentFile] {
-    guard let filesData = dynamicFields["files"]?.value as? [[String: Any]] else {
-      return []
-    }
-
-    return filesData.compactMap { dict -> TorrentFile? in
-      guard let name = dict["name"] as? String,
-        let length = (dict["length"] as? Int64) ?? (dict["length"] as? Int).map(Int64.init),
-        let bytesCompleted = (dict["bytesCompleted"] as? Int64)
-          ?? (dict["bytesCompleted"] as? Int).map(Int64.init)
-      else {
-        print("Failed to parse file: \(dict)")
-        return nil
+    guard let stats = trackerStats else { return nil }
+    // Convert JSONObject array to [String: Any] for compatibility
+    return stats.map { jsonObject in
+      var dict: [String: Any] = [:]
+      for (key, value) in jsonObject {
+        dict[key] = convertJSONValueToAny(value)
       }
-      return TorrentFile(name: name, length: length, bytesCompleted: bytesCompleted)
+      return dict
     }
   }
 
-  // Progress computation
-  var progress: Double {
-    if let pDone = percentDone {
-      return pDone
-    }
-    if let pComplete = percentComplete {
-      return pComplete
-    }
-    if let downloaded = downloadedEver, let total = totalSize, total > 0 {
-      return Double(downloaded) / Double(total)
-    }
-    return 0
-  }
-}
-
-struct AnyCodable: Codable {
-  let value: Any
-
-  init(_ value: Any) {
-    self.value = value
-  }
-
-  init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-
-    if container.decodeNil() {
-      self.value = NSNull()
-    } else if let value = try? container.decode(Bool.self) {
-      self.value = value
-    } else if let value = try? container.decode(Int.self) {
-      self.value = value
-    } else if let value = try? container.decode(Double.self) {
-      self.value = value
-    } else if let value = try? container.decode(String.self) {
-      self.value = value
-    } else if let value = try? container.decode([AnyCodable].self) {
-      self.value = value.map(\.value)
-    } else if let value = try? container.decode([String: AnyCodable].self) {
-      self.value = value.mapValues(\.value)
-    } else {
-      throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid JSON value")
-    }
-  }
-
-  func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-
+  private func convertJSONValueToAny(_ value: JSONValue) -> Any {
     switch value {
-    case is NSNull:
-      try container.encodeNil()
-    case let value as Bool:
-      try container.encode(value)
-    case let value as Int:
-      try container.encode(value)
-    case let value as Double:
-      try container.encode(value)
-    case let value as String:
-      try container.encode(value)
-    case let value as [Any]:
-      try container.encode(value.map(AnyCodable.init))
-    case let value as [String: Any]:
-      try container.encode(value.mapValues(AnyCodable.init))
-    default:
-      throw EncodingError.invalidValue(
-        value,
-        EncodingError.Context(
-          codingPath: container.codingPath,
-          debugDescription: "Invalid JSON value"
-        ))
+    case .null:
+      return NSNull()
+    case .bool(let bool):
+      return bool
+    case .int(let int):
+      return int
+    case .double(let double):
+      return double
+    case .string(let string):
+      return string
+    case .array(let array):
+      return array.map { convertJSONValueToAny($0) }
+    case .object(let object):
+      var dict: [String: Any] = [:]
+      for (key, val) in object {
+        dict[key] = convertJSONValueToAny(val)
+      }
+      return dict
     }
   }
 }
 
-// MARK: - Store
+// MARK: - TorrentManager
 @MainActor
 class TorrentManager: ObservableObject {
   @Published var torrents: [Torrent] = []
-  var fileCache: [String: [[String: Any]]] = [:]
+  var fileCache: [String: [TorrentFile]] = []
   private var downloadingCount: Int = 0
   @Published var isLoading = false
   private var nextFull = 0
 
-  var baseURL: URL?
-  var sessionId: String?
+  private var session: TransmissionSession?
   var fetchTimer: Timer?
   @AppStorage("refreshRate") var refreshRate = 6
 
-  private let standardFields = [
-    "id", "name", "percentDone", "percentComplete", "status", "addedDate",
-    "downloadedEver", "uploadedEver", "totalSize", "activityDate",
-    "error", "errorString", "labels", "downloadDir", "hashString",
+  private let standardFields: [TorrentField] = [
+    .id, .name, .percentDone, .percentComplete, .status, .addedDate,
+    .downloadedEver, .uploadedEver, .totalSize, .activityDate,
+    .error, .errorString, .labels, .downloadDir, .hashString,
   ]
 
-  private let fileFields = ["files", "fileStats"]
+  private let fileFields: [TorrentField] = [.files, .fileStats]
 
-  //    private let detailFields = [
-  //        "files",
-  //        "fileStats",
-  //        "uploadRatio",
-  //        "trackerStats",
-  //        "addedDate",
-  //    ]
-
-  func updateBaseURL(_ url: URL) {
+  func updateBaseURL(_ url: URL, username: String? = nil, password: String? = nil) {
     print("Base Changed")
-    baseURL = url
+    session = TransmissionSession(
+      baseURL: url,
+      username: username,
+      password: password
+    )
     reset()
   }
 
   func reset() {
-    print("manger reset")
+    print("manager reset")
     torrents = []
     fileCache = [:]
-    sessionId = nil
   }
 
   func getTorrentFiles(forHash hash: String) -> [TorrentFile] {
-    guard let filesData = fileCache[hash] else { return [] }
-
-    return filesData.compactMap { dict -> TorrentFile? in
-      guard let name = dict["name"] as? String,
-        let length = (dict["length"] as? Int64) ?? (dict["length"] as? Int).map(Int64.init),
-        let bytesCompleted = (dict["bytesCompleted"] as? Int64)
-          ?? (dict["bytesCompleted"] as? Int).map(Int64.init)
-      else {
-        print("Failed to parse file: \(dict)")
-        return nil
-      }
-      return TorrentFile(name: name, length: length, bytesCompleted: bytesCompleted)
-    }
+    return fileCache[hash] ?? []
   }
 
   func addTorrent(
     fileURL: URL? = nil, magnetLink: String? = nil, metainfo: String? = nil,
     downloadDir: String? = nil
   ) async throws -> (result: String, id: Int?) {
-    var arguments: [String: Any] = [:]
-
-    if let downloadDir = downloadDir {
-      arguments["download-dir"] = downloadDir
+    guard let session = session else {
+      throw NSError(
+        domain: "TorrentManager", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Session not initialized"])
     }
 
-    // For seeding: don't pause the torrent, let it start immediately
-    arguments["paused"] = false
+    var request: AddTorrentRequest
 
     if let magnetLink = magnetLink {
-      arguments["filename"] = magnetLink
+      request = .magnetLink(magnetLink, downloadDir: downloadDir, paused: false)
     } else if let fileURL = fileURL {
-      arguments["metainfo"] = try Data(contentsOf: fileURL).base64EncodedString()
+      request = try .torrentURL(fileURL, downloadDir: downloadDir, paused: false)
     } else if let metainfo = metainfo {
-      arguments["metainfo"] = metainfo
+      let data = Data(base64Encoded: metainfo) ?? Data()
+      request = .torrentFile(data, downloadDir: downloadDir, paused: false)
+    } else {
+      return ("failed", nil)
     }
 
-    let (success, responseArgs) = try await makeRequest("torrent-add", arguments: arguments)
+    do {
+      let result = try await session.addTorrent(request)
 
-    print("Debug - torrent-add request:")
-    print("  - arguments: \(arguments)")
-    print("  - success: \(success)")
-    print("  - responseArgs: \(responseArgs ?? [:])")
+      print("Debug - torrent-add request:")
+      print("  - success: true")
+      print("  - isDuplicate: \(result.isDuplicate)")
+      print("  - torrent ID: \(result.id ?? -1)")
 
-    if success {
-      let addedTorrent =
-        (responseArgs?["torrent-added"] as? [String: Any])
-        ?? (responseArgs?["torrent-duplicate"] as? [String: Any])
-
-      print("  - addedTorrent: \(addedTorrent ?? [:])")
-
-      if let id = addedTorrent?["id"] as? Int {
+      if let id = result.id {
         return ("success", id)
       } else {
         print("  - Warning: No torrent ID found in response")
         return ("success", nil)
       }
+    } catch {
+      print("  - Error: \(error)")
+      return ("failed", nil)
     }
-
-    return ("failed", nil)
   }
 
   func fetchTorrentDetails(id: Int) async throws -> Torrent? {
-    let detailFields =
-      standardFields + [
-        "files",
-        "fileStats",
-        "uploadRatio",
-        "trackerStats",
-        "addedDate",
-        "activityDate",
-        "downloadedEver",
-        "uploadedEver",
-        "totalSize",
-        "magnetLink",
-        "torrentFile",
-      ]
+    guard let session = session else { return nil }
 
-    let (success, responseArgs) = try await makeRequest(
-      "torrent-get",
-      arguments: [
-        "fields": detailFields,
-        "ids": [id],
-      ]
-    )
-
-    if success,
-      let torrentData = (responseArgs?["torrents"] as? [[String: Any]])?.first
-    {
-      let decoder = JSONDecoder()
-      let data = try JSONSerialization.data(withJSONObject: torrentData)
-      return try decoder.decode(Torrent.self, from: data)
-    }
-
-    return nil
-  }
-
-  // Simplified method to get basic torrent info for status checking
-  func getTorrentInfo(id: Int) async throws -> [Torrent] {
-    let statusFields = [
-      "id",
-      "name",
-      "status",
-      "percentDone",
-      "totalSize",
-      "downloadedEver",
-      "uploadedEver",
-      "downloadDir",
-      "errorString",
-      "wanted",
+    let detailFields: [TorrentField] = standardFields + [
+      .files, .fileStats, .uploadRatio, .trackerStats, .addedDate,
+      .activityDate, .downloadedEver, .uploadedEver, .totalSize,
+      .magnetLink, .torrentFile,
     ]
 
-    let (success, responseArgs) = try await makeRequest(
-      "torrent-get",
-      arguments: [
-        "fields": statusFields,
-        "ids": [id],
-      ]
-    )
-
-    if success,
-      let torrentsData = responseArgs?["torrents"] as? [[String: Any]]
-    {
-      let decoder = JSONDecoder()
-      var torrents: [Torrent] = []
-
-      for torrentData in torrentsData {
-        let data = try JSONSerialization.data(withJSONObject: torrentData)
-        let torrent = try decoder.decode(Torrent.self, from: data)
-        torrents.append(torrent)
-      }
-
-      return torrents
-    }
-
-    return []
+    return try await session.getTorrent(id: .id(id))
   }
 
-  func makeRequest(_ method: String, arguments: [String: Any]) async throws -> (
-    Bool, [String: Any]?
-  ) {
-    guard let baseURL = baseURL else { return (false, nil) }
+  func getTorrentInfo(id: Int) async throws -> [Torrent] {
+    guard let session = session else { return [] }
 
-    var urlRequest = URLRequest(url: baseURL)
-    urlRequest.httpMethod = "POST"
-    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    if let sessionId = sessionId {
-      urlRequest.setValue(sessionId, forHTTPHeaderField: "X-Transmission-Session-Id")
-    }
+    let statusFields: [TorrentField] = [
+      .id, .name, .status, .percentDone, .totalSize,
+      .downloadedEver, .uploadedEver, .downloadDir,
+      .errorString, .wanted,
+    ]
 
-    let requestDict: [String: Any] = ["method": method, "arguments": arguments]
-    let requestData = try JSONSerialization.data(withJSONObject: requestDict)
-    urlRequest.httpBody = requestData
+    let response = try await session.getTorrents(
+      fields: statusFields,
+      ids: [.id(id)]
+    )
 
-    let (data, response) = try await URLSession.shared.data(for: urlRequest)
-
-    if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 409,
-      let newSessionId = httpResponse.allHeaderFields["X-Transmission-Session-Id"] as? String
-    {
-      sessionId = newSessionId
-      return try await makeRequest(method, arguments: arguments)
-    }
-
-    let responseDict = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-    let success = responseDict?["result"] as? String == "success"
-    let responseArgs = responseDict?["arguments"] as? [String: Any]
-
-    return (success, responseArgs)
+    return response.torrents
   }
 
   func fetchUpdates(selectedId: Int? = nil, fullFetch: Bool = false) async throws {
-    guard let baseURL = baseURL else { return }
+    guard let session = session else { return }
     @AppStorage("overideFullFetch") var fullFetchAnyway = false
 
     defer { isLoading = false }
-    // await TunnelManagerHolder.shared.ensureAllTunnelsHealth()
-    var fieldsToFetch: [String] = []
 
+    var fieldsToFetch: [TorrentField] = []
     var firstFetch = fullFetch == true ? true : fileCache.isEmpty
 
     if fullFetchAnyway {
@@ -482,88 +175,40 @@ class TorrentManager: ObservableObject {
       fullFetchAnyway = false
     }
 
-    fieldsToFetch = firstFetch ? standardFields + ["files"] : standardFields
+    fieldsToFetch = firstFetch ? standardFields + [.files] : standardFields
 
-    // Make base request
-    let request = TorrentRequest(fields: fieldsToFetch)
-    var urlRequest = URLRequest(url: baseURL)
-    urlRequest.httpMethod = "POST"
-    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    if let sessionId = sessionId {
-      urlRequest.setValue(sessionId, forHTTPHeaderField: "X-Transmission-Session-Id")
-    }
-
-    let encoder = JSONEncoder()
-    let requestData = try encoder.encode(request)
-    urlRequest.httpBody = requestData
-
-    let (data, response) = try await URLSession.shared.data(for: urlRequest)
-
-    if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 409 {
-      if let responseText = String(data: data, encoding: .utf8),
-        let range = responseText.range(of: "X-Transmission-Session-Id: "),
-        let endRange = responseText[range.upperBound...].range(of: "</code>")
-      {
-        let newSessionId = String(responseText[range.upperBound..<endRange.lowerBound])
-        sessionId = newSessionId
-        return try await fetchUpdates(selectedId: selectedId)
-      }
-    }
-
-    let decodedResponse = try JSONDecoder().decode(TorrentResponse.self, from: data)
+    // Fetch torrents using the session
+    let response = try await session.getTorrents(fields: fieldsToFetch, ids: nil)
 
     // Handle file caching
     if firstFetch && selectedId == nil {
-      //            if fullFetch {
-      //                fileCache = [:]
-      //            }
-      //     print("First fetch - caching files")
-      //   print("Number of torrents: \(decodedResponse.arguments.torrents.count)")
-      for torrent in decodedResponse.arguments.torrents {
+      for torrent in response.torrents {
         if let hash = torrent.hashString {
-          // print("Got hash: \(hash)")
-          // print("Files data type: \(type(of: torrent.dynamicFields["files"]?.value ?? "none"))")
-          if let filesData = torrent.dynamicFields["files"]?.value as? [[String: Any]] {
-            //  print("Cast succeeded: \(filesData.count) files")
-            fileCache[hash] = filesData
-          } else {
-            print("Cast failed")
+          let files = torrent.files
+          if !files.isEmpty {
+            fileCache[hash] = files
           }
         }
       }
     }
 
-    let torrentsToUpdate = decodedResponse.arguments.torrents
+    let torrentsToUpdate = response.torrents
 
-    //any with no file info?
-    let thisNoFiles = torrentsToUpdate.filter({ $0.files.count == 0 }).count
-    let thisDownloadingCount = torrentsToUpdate.filter({ $0.percentDone != 1 }).count
+    // Check for torrents with no file info
+    let thisNoFiles = torrentsToUpdate.filter { $0.files.count == 0 }.count
+    let thisDownloadingCount = torrentsToUpdate.filter { ($0.percentDone ?? 1) != 1 }.count
 
-    //        //how many downloads?
-    //        let thisDownloadingCount = torrentsToUpdate.filter({$0.percentDone != 1}).count
-    //        //print("Download Count: \(thisDownloadingCount)")
-    //
     if (thisDownloadingCount != downloadingCount || thisNoFiles > 0) && !fullFetch {
-      //fileCache = [:]
-      //try await fetchUpdates( fullFetch: true)
       fullFetchAnyway = true
     }
-    //
-    downloadingCount = thisDownloadingCount
 
+    downloadingCount = thisDownloadingCount
     torrents = torrentsToUpdate
   }
 
   func startPeriodicUpdates(selectedId: Int? = nil) {
-    // First, stop any existing timer to avoid duplicates
     stopPeriodicUpdates()
 
-    // Initial fetch
-    //        Task {
-    //            try? await fetchUpdates(selectedId: selectedId)
-    //        }
-
-    // Create new timer
     fetchTimer = Timer.scheduledTimer(withTimeInterval: Double(refreshRate), repeats: true) {
       [weak self] _ in
       Task {
@@ -582,36 +227,22 @@ class TorrentManager: ObservableObject {
   }
 }
 
-// Extension to create Torrent from cached fields
-extension Torrent {
-  init(from fields: [String: AnyCodable]) {
-    self.dynamicFields = fields
-  }
-}
-
+// MARK: - Field Access Extensions
 extension TorrentManager {
-  /// Fetches specific fields from the server for all torrents
-  /// - Parameter fields: Array of field names to fetch from the server
-  /// - Returns: A dictionary mapping torrent IDs to their requested field values
-  func getFields(_ fields: [String]) async throws -> [Int: [String: Any]] {
-    // Add 'id' to the fields if not present, as we need it for mapping
+  func getFields(_ fields: [TorrentField]) async throws -> [Int: [String: Any]] {
     var requestFields = fields
-    if !fields.contains("id") {
-      requestFields.append("id")
+    if !fields.contains(.id) {
+      requestFields.append(.id)
     }
 
-    // Fetch the updates from server
     try await fetchUpdates()
 
-    // Create result dictionary
     var result: [Int: [String: Any]] = [:]
-
-    // Map the requested fields for each torrent
     for torrent in torrents {
       var torrentFields: [String: Any] = [:]
       for field in fields {
-        if let value = torrent.dynamicFields[field]?.value {
-          torrentFields[field] = value
+        if let value = torrent.fields[field.rawValue] {
+          torrentFields[field.rawValue] = convertJSONValueToAny(value)
         }
       }
       if !torrentFields.isEmpty {
@@ -622,16 +253,12 @@ extension TorrentManager {
     return result
   }
 
-  /// Fetches a single field from the server for all torrents
-  /// - Parameter field: The field name to fetch from the server
-  /// - Returns: A dictionary mapping torrent IDs to the requested field value
-  func getField<T>(_ field: String) async throws -> [Int: T] {
+  func getField<T>(_ field: TorrentField) async throws -> [Int: T] {
     let results = try await getFields([field])
 
-    // Convert and filter the results to the requested type
     var typedResults: [Int: T] = [:]
     for (id, fields) in results {
-      if let value = fields[field] as? T {
+      if let value = fields[field.rawValue] as? T {
         typedResults[id] = value
       }
     }
@@ -639,32 +266,24 @@ extension TorrentManager {
     return typedResults
   }
 
-  func getFiles(forHash hash: String) -> [[String: Any]]? {
+  func getFiles(forHash hash: String) -> [TorrentFile]? {
     return fileCache[hash]
   }
 
-  /// Fetches specific fields from the server for specific torrents
-  /// - Parameters:
-  ///   - fields: Array of field names to fetch
-  ///   - ids: Array of torrent IDs to fetch data for
-  /// - Returns: A dictionary mapping torrent IDs to their requested field values
-  func getFields(_ fields: [String], forIds ids: [Int]) async throws -> [Int: [String: Any]] {
-    // Add 'id' to the fields if not present
+  func getFields(_ fields: [TorrentField], forIds ids: [Int]) async throws -> [Int: [String: Any]] {
     var requestFields = fields
-    if !fields.contains("id") {
-      requestFields.append("id")
+    if !fields.contains(.id) {
+      requestFields.append(.id)
     }
 
-    // Fetch updates for specific torrents
     try await fetchUpdates()
 
-    // Filter results for requested torrents only
     var result: [Int: [String: Any]] = [:]
     for torrent in torrents where ids.contains(torrent.id) {
       var torrentFields: [String: Any] = [:]
       for field in fields {
-        if let value = torrent.dynamicFields[field]?.value {
-          torrentFields[field] = value
+        if let value = torrent.fields[field.rawValue] {
+          torrentFields[field.rawValue] = convertJSONValueToAny(value)
         }
       }
       if !torrentFields.isEmpty {
@@ -674,150 +293,79 @@ extension TorrentManager {
 
     return result
   }
-}
 
-// MARK: - Session Models
-struct SessionRequest: Codable {
-  var method = "session-get"
-  let arguments: Arguments?
-
-  struct Arguments: Codable {
-    let fields: [String]?
-  }
-
-  init(fields: [String]? = nil) {
-    self.arguments = fields.map { Arguments(fields: $0) }
-  }
-}
-
-struct SessionResponse: Codable {
-  let arguments: [String: AnyCodable]
-  let result: String
-
-  struct Units: Codable {
-    let speedUnits: [String]
-    let speedBytes: Int
-    let sizeUnits: [String]
-    let sizeBytes: Int
-    let memoryUnits: [String]
-    let memoryBytes: Int
-
-    enum CodingKeys: String, CodingKey {
-      case speedUnits = "speed-units"
-      case speedBytes = "speed-bytes"
-      case sizeUnits = "size-units"
-      case sizeBytes = "size-bytes"
-      case memoryUnits = "memory-units"
-      case memoryBytes = "memory-bytes"
+  private func convertJSONValueToAny(_ value: JSONValue) -> Any {
+    switch value {
+    case .null:
+      return NSNull()
+    case .bool(let bool):
+      return bool
+    case .int(let int):
+      return int
+    case .double(let double):
+      return double
+    case .string(let string):
+      return string
+    case .array(let array):
+      return array.map { convertJSONValueToAny($0) }
+    case .object(let object):
+      var dict: [String: Any] = [:]
+      for (key, val) in object {
+        dict[key] = convertJSONValueToAny(val)
+      }
+      return dict
     }
   }
 }
 
 // MARK: - Session Manager Extension
 extension TorrentManager {
-  /// Fetches all session information
-  /// - Returns: Dictionary containing all session fields and their values
   func getSession() async throws -> [String: Any] {
-    guard let baseURL = baseURL else {
+    guard let session = session else {
       throw NSError(
         domain: "TransmissionClient", code: -1,
-        userInfo: [NSLocalizedDescriptionKey: "Base URL not set"])
+        userInfo: [NSLocalizedDescriptionKey: "Session not initialized"])
     }
 
-    var urlRequest = URLRequest(url: baseURL)
-    urlRequest.httpMethod = "POST"
-    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    if let sessionId = sessionId {
-      urlRequest.setValue(sessionId, forHTTPHeaderField: "X-Transmission-Session-Id")
+    let info = try await session.getSessionInfo()
+
+    // Convert to [String: Any] for compatibility
+    var result: [String: Any] = [:]
+    for (key, value) in info.fields {
+      result[key] = convertJSONValueToAny(value)
     }
-
-    let request = SessionRequest()
-    let encoder = JSONEncoder()
-    let requestData = try encoder.encode(request)
-    urlRequest.httpBody = requestData
-
-    let (data, httpResponse) = try await URLSession.shared.data(for: urlRequest)
-
-    // Handle 409 response for session ID
-    if let httpResponse = httpResponse as? HTTPURLResponse {
-      if httpResponse.statusCode == 409 {
-        if let newSessionId = httpResponse.allHeaderFields["X-Transmission-Session-Id"] as? String {
-          sessionId = newSessionId
-          return try await getSession()
-        }
-        throw NSError(domain: "TransmissionClient", code: 409)
-      }
-    }
-
-    let response = try JSONDecoder().decode(SessionResponse.self, from: data)
-    return response.arguments.mapValues { $0.value }
+    return result
   }
 
-  /// Fetches specific session fields
-  /// - Parameter fields: Array of field names to fetch
-  /// - Returns: Dictionary containing requested session fields and their values
   func getSession(fields: [String]) async throws -> [String: Any] {
-    guard let baseURL = baseURL else {
+    guard let session = session else {
       throw NSError(
         domain: "TransmissionClient", code: -1,
-        userInfo: [NSLocalizedDescriptionKey: "Base URL not set"])
+        userInfo: [NSLocalizedDescriptionKey: "Session not initialized"])
     }
 
-    var urlRequest = URLRequest(url: baseURL)
-    urlRequest.httpMethod = "POST"
-    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    if let sessionId = sessionId {
-      urlRequest.setValue(sessionId, forHTTPHeaderField: "X-Transmission-Session-Id")
-    }
+    let info = try await session.getSessionInfo(fields: fields)
 
-    let request = SessionRequest(fields: fields)
-    let encoder = JSONEncoder()
-    let requestData = try encoder.encode(request)
-    urlRequest.httpBody = requestData
-
-    let (data, httpResponse) = try await URLSession.shared.data(for: urlRequest)
-
-    // Handle 409 response for session ID
-    if let httpResponse = httpResponse as? HTTPURLResponse {
-      if httpResponse.statusCode == 409 {
-        if let newSessionId = httpResponse.allHeaderFields["X-Transmission-Session-Id"] as? String {
-          sessionId = newSessionId
-          return try await getSession(fields: fields)
-        }
-        throw NSError(domain: "TransmissionClient", code: 409)
-      }
-    }
-
-    let response = try JSONDecoder().decode(SessionResponse.self, from: data)
     var result: [String: Any] = [:]
-
     for field in fields {
-      if let value = response.arguments[field]?.value {
-        result[field] = value
+      if let value = info.fields[field] {
+        result[field] = convertJSONValueToAny(value)
       }
     }
 
     return result
   }
 
-  /// Fetches a single session field with type safety
-  /// - Parameter field: The field name to fetch
-  /// - Returns: The value of the requested field
   func getSessionField<T>(_ field: String) async throws -> T? {
     let result = try await getSession(fields: [field])
     return result[field] as? T
   }
 
-  /// Convenience method to get download directory
-  /// - Returns: The configured download directory path
   func getDownloadDirectory() async throws -> String? {
     return try await getSessionField("download-dir")
   }
 
-  /// Convenience method to get current speed limits
-  /// - Returns: Tuple containing up and down speed limits and their enabled status
-  func getSpeedLimits() async throws -> (up: Int?, down: Int?, upEnabled: Bool?, downEnabled: Bool?)
-  {
+  func getSpeedLimits() async throws -> (up: Int?, down: Int?, upEnabled: Bool?, downEnabled: Bool?) {
     let fields = [
       "speed-limit-up",
       "speed-limit-down",
@@ -833,16 +381,5 @@ extension TorrentManager {
       upEnabled: result["speed-limit-up-enabled"] as? Bool,
       downEnabled: result["speed-limit-down-enabled"] as? Bool
     )
-  }
-
-  /// Convenience method to get units configuration
-  /// - Returns: The units configuration object
-  func getUnits() async throws -> SessionResponse.Units? {
-    let result = try await getSession(fields: ["units"])
-    if let unitsDict = result["units"] as? [String: Any] {
-      let unitsData = try JSONSerialization.data(withJSONObject: unitsDict)
-      return try JSONDecoder().decode(SessionResponse.Units.self, from: unitsData)
-    }
-    return nil
   }
 }
