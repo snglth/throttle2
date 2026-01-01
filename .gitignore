@@ -2,3 +2,9 @@ Pods/*
 .claude
 .derivedData
 .DS_Store
+.home
+.tmp
+TransmissionRPC/.build
+TransmissionRPC/.clang-module-cache
+TransmissionRPC/.home
+*.xcuserstate
