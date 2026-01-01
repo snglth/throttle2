@@ -15,6 +15,8 @@ struct ServerStatusBar: View {
   @State private var totalTorrents: Int = 0
   @State private var freeSpace: Int64 = 0
   @State private var refreshTask: Task<Void, Never>?
+  @State private var statsErrorSummary: String?
+  @State private var statsErrorDetail: String?
   //    @AppStorage("isMounted") var isMounted: Bool = false
 
   // Timer for refresh
@@ -72,14 +74,28 @@ struct ServerStatusBar: View {
         Spacer()
 
         VStack(alignment: .leading) {
-          HStack {
-            Text("↓").font(.caption).foregroundColor(.blue)
-            Text("\(downloadSpeedFormatted)").font(.caption)
-          }
-          HStack {
+          if let statsErrorSummary {
+            HStack(spacing: innerSpacing) {
+              Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.red)
+              Text(statsErrorSummary).font(.caption)
+            }
+            #if os(macOS)
+              .help(statsErrorDetail ?? "")
+            #endif
+            Text("Check server connection")
+              .font(.caption2)
+              .foregroundColor(.secondary)
+          } else {
             HStack {
-              Text("↑").font(.caption).foregroundColor(.green)
-              Text("\(uploadSpeedFormatted)").font(.caption)
+              Text("↓").font(.caption).foregroundColor(.blue)
+              Text("\(downloadSpeedFormatted)").font(.caption)
+            }
+            HStack {
+              HStack {
+                Text("↑").font(.caption).foregroundColor(.green)
+                Text("\(uploadSpeedFormatted)").font(.caption)
+              }
             }
           }
         }
@@ -251,6 +267,12 @@ struct ServerStatusBar: View {
   }
 
   private func resetStats() {
+    clearStatsValues()
+    statsErrorSummary = nil
+    statsErrorDetail = nil
+  }
+
+  private func clearStatsValues() {
     downloadSpeed = 0
     uploadSpeed = 0
     activeTorrents = 0
@@ -277,6 +299,8 @@ struct ServerStatusBar: View {
 
         // Update UI on main thread
         await MainActor.run {
+          statsErrorSummary = nil
+          statsErrorDetail = nil
           downloadSpeed = sessionStats.downloadSpeed
           uploadSpeed = sessionStats.uploadSpeed
           activeTorrents = sessionStats.activeTorrentCount
@@ -298,6 +322,14 @@ struct ServerStatusBar: View {
           }
         }
       } catch {
+        if shouldIgnoreStatsError(error) {
+          return
+        }
+        await MainActor.run {
+          statsErrorSummary = "Server unresponsive"
+          statsErrorDetail = String(describing: error)
+          clearStatsValues()
+        }
         print("Error updating server stats: \(error)")
       }
     }
@@ -332,7 +364,6 @@ struct ServerStatusBar: View {
         var count = 0
         for server in servers {
           if let mountKey = ServerMountManager.shared.getMountKey(for: server) {
-            let mountPath = ServerMountUtilities.getMountPath(for: mountKey)
             if ServerMountManager.shared.isPathMounted(mountKey) {
               count += 1
             }
@@ -363,6 +394,16 @@ struct ServerStatusBar: View {
     formatter.allowedUnits = [.useKB, .useMB, .useGB, .useTB]
     formatter.countStyle = .file
     return formatter.string(fromByteCount: bytes).replacingOccurrences(of: "Zero", with: "0")
+  }
+
+  private func shouldIgnoreStatsError(_ error: Error) -> Bool {
+    if error is CancellationError {
+      return true
+    }
+    if let urlError = error as? URLError, urlError.code == .cancelled {
+      return true
+    }
+    return false
   }
 }
 
