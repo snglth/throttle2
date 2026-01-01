@@ -202,10 +202,6 @@
               try FileManager.default.moveItem(
                 at: localURL, to: URL(fileURLWithPath: destinationPath))
 
-              // Check if the downloaded file is actually a directory (auto-unzipped .app)
-              var isDirectory: ObjCBool = false
-              let isFile = FileManager.default.fileExists(
-                atPath: destinationPath, isDirectory: &isDirectory)
 
               downloadedFiles.append(destinationPath)
 
