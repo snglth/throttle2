@@ -90,26 +90,39 @@ struct TorrentListView: View {
 	        torrentListDialogs
 	    }
 	    
-	    private var torrentListBase: some View {
-	        VStack {
-	            ScrollView {
-	                LazyVStack {
-	#if os(iOS)
-	                    if manager.isLoading {
-	                        ProgressView()
-	                    }
-	#endif
-	                    
-	                    ForEach(sortedTorrents) { torrent in
-	                        torrentRow(for: torrent)
-	                    }
-	                }.padding(.bottom, 0)
-	            }.padding(.bottom, 0)
-	            ServerStatusBar(
-	                manager: manager,
-	                store: store,
-	                showServerSettings: $showServerSettings,
-	            ).padding(.top,-10)
+    private var torrentListBase: some View {
+        let torrents = sortedTorrents
+        return VStack {
+            ZStack {
+                ScrollView {
+                    LazyVStack {
+#if os(iOS)
+                        if manager.isLoading {
+                            ProgressView()
+                        }
+#endif
+                        
+                        ForEach(torrents) { torrent in
+                            torrentRow(for: torrent)
+                        }
+                    }.padding(.bottom, 0)
+                }.padding(.bottom, 0)
+#if os(macOS)
+                if manager.isLoading && torrents.isEmpty {
+                    VStack(spacing: 8) {
+                        ProgressView()
+                        Text("Loading torrents...")
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+#endif
+            }
+            ServerStatusBar(
+                manager: manager,
+                store: store,
+                showServerSettings: $showServerSettings,
+            ).padding(.top,-10)
 	//                .onTapGesture {
 	//                    #if os(iOS)
 	//                    if !isiPad {

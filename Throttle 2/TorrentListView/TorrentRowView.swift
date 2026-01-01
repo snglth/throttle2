@@ -23,18 +23,24 @@ struct TorrentRowView: View {
   @AppStorage("showThumbs") var showThumbs: Bool = false
   var selecting: Bool
   @Binding var selected: [Int]
-  @AppStorage("primaryFile") var primaryFiles: Bool = false
-  @AppStorage("thumbsLocal") var thumbsLocal = false
   @AppStorage("useInternalBrowser") var useInternalBrowser: Bool = false
   let torrentProgress: Double
-
-  // Cache expensive computations
-  @State private var cachedMediaFiles: [TorrentFile] = []
-  @State private var shouldShowThumbnail = false
 
   let videoExtensions = [
     "mp4", "mov", "m4v", "avi", "mkv", "wmv", "flv", "webm", "3gp", "mpg", "mpeg", "vob",
   ]
+
+  private var torrentPlaceholderIcon: some View {
+    ZStack {
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .fill(Color.secondary.opacity(0.15))
+      Image(systemName: "arrow.down.circle.fill")
+        .font(.system(size: 24, weight: .semibold))
+        .foregroundStyle(.secondary)
+    }
+    .frame(width: 60, height: 60)
+    .padding(.trailing, 5)
+  }
 
   #if os(iOS)
     var isiPad: Bool {
@@ -65,62 +71,7 @@ struct TorrentRowView: View {
         .padding(.trailing)
       }
       if showThumbs && !selecting {
-        if shouldShowThumbnail && !cachedMediaFiles.isEmpty {
-          if store.selection != nil {
-            #if os(iOS)
-              TorrentThumbnailView(
-                mediaFiles: cachedMediaFiles, torrent: torrent, server: store.selection!)
-            #else
-              if store.selection?.sftpBrowse == true {
-                if thumbsLocal {
-                  // For local thumbnails, use the first media file
-                  if let mediaFile = cachedMediaFiles.first {
-                    let mediaPath = get_media_path_local(
-                      file: mediaFile, torrent: torrent, server: store.selection!)
-                    PathThumbnailViewMacOS(path: mediaPath)
-                  }
-                } else {
-                  TorrentThumbnailView(
-                    mediaFiles: cachedMediaFiles, torrent: torrent, server: store.selection!)
-                }
-              } else if store.selection?.fsBrowse == true {
-                // For filesystem browsing, use the first media file
-                if let mediaFile = cachedMediaFiles.first,
-                  let downloadDir = torrent.dynamicFields["downloadDir"]?.value as? String,
-                  let serverPath = store.selection?.pathServer,
-                  let filesystemPath = store.selection?.pathFilesystem,
-                  let decodedName = mediaFile.name.removingPercentEncoding
-                {
-
-                  let pathSuffix =
-                    downloadDir.hasPrefix(serverPath)
-                    ? String(downloadDir.dropFirst(serverPath.count)) : downloadDir
-
-                  let mediaPath = filesystemPath + String(pathSuffix) + "/" + decodedName
-
-                  PathThumbnailViewMacOS(path: mediaPath)
-                } else {
-                  // Provide a fallback view for when any of the optionals are nil
-                  Text("Unable to display thumbnail")
-                }
-              }
-            #endif
-          } else {
-            Image("folder")
-              .resizable()
-              .aspectRatio(contentMode: .fit)
-              .frame(width: 60, height: 60)
-              .padding(.trailing, 5)
-              .foregroundColor(.secondary)
-          }
-        } else {
-          Image("folder-downloading")
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .frame(width: 60, height: 60)
-            .padding(.trailing, 5)
-            .foregroundColor(.secondary)
-        }
+        torrentPlaceholderIcon
       }
 
       VStack(alignment: .leading, spacing: 8) {
@@ -276,20 +227,7 @@ struct TorrentRowView: View {
     .padding(.vertical, 4)
     .padding(.horizontal, 15)
     .task(id: "\(torrent.id)-\(torrentProgress)") {
-      // Compute cached values once per torrent, re-run when progress changes
       isStarred = manager.isStarred(torrent)
-
-      // Only compute media files if showing thumbnails and torrent is complete
-      if showThumbs && !selecting && torrent.hashString != nil && torrentProgress == 1 {
-        if let hash = torrent.hashString {
-          let torrentFiles = manager.getTorrentFiles(forHash: hash)
-          cachedMediaFiles = findAllMediaFiles(from: torrentFiles)
-          shouldShowThumbnail = true
-        }
-      } else {
-        cachedMediaFiles = []
-        shouldShowThumbnail = false
-      }
     }
     .contextMenu {
       Button(role: .destructive) {
@@ -369,68 +307,6 @@ struct TorrentRowView: View {
       }
     #endif
   }
-  func findFirstMediaFile(from files: [TorrentFile]) -> TorrentFile? {
-
-    //print("Number of files: \(files.count)")
-
-    //        let filetype =
-    let videoExtensions = [
-      "mp4", "mov", "m4v", "avi", "mkv", "wmv", "flv", "webm", "3gp", "mpg", "mpeg", "vob",
-    ]
-    let imageExtensions = [
-      "jpg", "jpeg", "png", "gif", "heic", "heif", "bmp", "tiff", "webp", "jfif",
-    ]
-
-    // First try to find a video
-    if let firstImage = files.first(where: { file in
-      let ext = file.name.components(separatedBy: ".").last?.lowercased() ?? ""
-      return (imageExtensions.contains(ext) && file.progress == 1)
-    }) {
-      return firstImage
-    }
-
-    // If no image found, try to find a video
-    return files.first(where: { file in
-      let ext = file.name.components(separatedBy: ".").last?.lowercased() ?? ""
-      return (videoExtensions.contains(ext) && file.progress == 1)
-    })
-  }
-
-  func findAllMediaFiles(from files: [TorrentFile]) -> [TorrentFile] {
-    let videoExtensions = [
-      "mp4", "mov", "m4v", "avi", "mkv", "wmv", "flv", "webm", "3gp", "mpg", "mpeg", "vob",
-    ]
-    let imageExtensions = [
-      "jpg", "jpeg", "png", "gif", "heic", "heif", "bmp", "tiff", "webp", "jfif",
-    ]
-
-    // Return all completed media files, prioritizing images first, then videos
-    let images = files.filter { file in
-      let ext = file.name.components(separatedBy: ".").last?.lowercased() ?? ""
-      return imageExtensions.contains(ext) && file.progress == 1
-    }
-
-    let videos = files.filter { file in
-      let ext = file.name.components(separatedBy: ".").last?.lowercased() ?? ""
-      return videoExtensions.contains(ext) && file.progress == 1
-    }
-
-    return images + videos
-  }
-
-  // #if os(iOS)
-  func get_media_path(file: TorrentFile, torrent: Torrent, server: ServerEntity) -> String {
-    let name = file.name
-    if let path = torrent.dynamicFields["downloadDir"] {
-      //let baseDir = server.pathServer!
-      let returnvalue = "\(path.value)/\(name)".replacingOccurrences(of: "//", with: "/")
-      //print("returning path: " + returnvalue)
-      return returnvalue
-    }
-    return ""
-  }
-  //#/endif
-
   #if os(macOS)
 
     func openInFinder(url: URL) {
@@ -449,23 +325,6 @@ struct TorrentRowView: View {
         // Handle error - path doesn't exist
         print("Path doesn't exist: \(url.path)")
       }
-    }
-
-    func get_media_path_local(file: TorrentFile, torrent: Torrent, server: ServerEntity) -> String {
-      let name = file.name
-      let baseDir = server.pathServer!
-      if var path = torrent.dynamicFields["downloadDir"]?.value as? String {
-        if path.hasPrefix(baseDir) {
-          path = String(path.dropFirst(baseDir.count))
-          if path.hasPrefix("/") { path = String(path.dropFirst()) }
-          let mountBase = ServerMountManager.shared.getMountPath(for: store.selection!)
-            .absoluteString.dropLast().replacingOccurrences(of: "file://", with: "")
-          let returnvalue = "\(mountBase)/\(path)/\(name)"
-          print("returning path: " + returnvalue)
-          return returnvalue
-        }
-      }
-      return ""
     }
 
     func get_mapped_path(file: TorrentFile, torrent: Torrent, server: ServerEntity) -> String {
